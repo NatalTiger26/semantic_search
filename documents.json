@@ -1,0 +1,12 @@
+[
+  {
+    "topic": "example",
+    "text": "This is a placeholder document showing the expected shape: a topic label, a short text passage, and a unique id.",
+    "id": 0
+  },
+  {
+    "topic": "example",
+    "text": "Replace everything in this file with your own corpus - see Lab3_Instructions.md for what makes a good one.",
+    "id": 1
+  }
+]
