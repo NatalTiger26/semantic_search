@@ -24,9 +24,7 @@ from dotenv import load_dotenv
 load_dotenv()  # picks up NVIDIA_API_KEY and LAB3_EMBEDDING_MODE from a .env file, if present
 
 EMBEDDING_MODE = os.environ.get("LAB3_EMBEDDING_MODE", "offline")  # "api" or "offline"
-print(f"EMBEDDING_MODE={EMBEDDING_MODE}")  # Debugging line
 API_KEY = os.environ.get("NVIDIA_API_KEY")
-print(f"API_KEY={'found' if API_KEY else 'not found'}")  # Debugging line
 EMBEDDING_MODEL = "nvidia/nv-embedqa-e5-v5"
 EMBEDDING_URL = "https://integrate.api.nvidia.com/v1/embeddings"
 
@@ -46,7 +44,6 @@ def _get_embedding_offline(text, dim=OFFLINE_DIM):
     it just isn't a semantic embedding, so don't expect meaning-based
     matches from it. Swap to API mode for that.
     """
-    print("using offline embedding for text")  # Debugging line
 
     vec = [0.0] * dim
     words = _WORD_RE.findall(text.lower())
@@ -60,28 +57,20 @@ def _get_embedding_offline(text, dim=OFFLINE_DIM):
 # -----------------------------------------------------------------------
 
 
-# def _get_embedding_api(text, input_type="passage"):
-#     """TODO: implement this.
-
-#     Call NVIDIA NIM's embeddings endpoint (same pattern as Lab 1's chat
-#     completions call - check for a key, POST with the right headers/body,
-#     handle the response) and return the embedding as a plain list of floats.
-
-#     Two things that are DIFFERENT from Lab 1's chat endpoint - read the
-#     NIM API docs / Lab3_Instructions.md before assuming the shape:
-#       - `input` in the request body must be a LIST of strings, not a bare string.
-#       - this model needs an `input_type` field: "passage" for documents you're
-#         indexing, "query" for the search query itself.
-#     """
-#     raise NotImplementedError("implement the NVIDIA NIM embeddings call")
-
-
-
 def _get_embedding_api(text, input_type="passage"):
+    """TODO: implement this.
+
+    Call NVIDIA NIM's embeddings endpoint (same pattern as Lab 1's chat
+    completions call - check for a key, POST with the right headers/body,
+    handle the response) and return the embedding as a plain list of floats.
+
+    Two things that are DIFFERENT from Lab 1's chat endpoint - read the
+    NIM API docs / Lab3_Instructions.md before assuming the shape:
+      - `input` in the request body must be a LIST of strings, not a bare string.
+      - this model needs an `input_type` field: "passage" for documents you're
+        indexing, "query" for the search query itself.
     """
-    Fetch an embedding from NVIDIA NIM.
-    """
-    print(f"using API")  # Debugging line
+
     if API_KEY is None:
         raise ValueError("NVIDIA_API_KEY not found.")
 
@@ -103,7 +92,6 @@ def _get_embedding_api(text, input_type="passage"):
     )
 
     response.raise_for_status()
-
     data = response.json()
 
     return data["data"][0]["embedding"]
