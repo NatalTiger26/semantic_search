@@ -1,4 +1,4 @@
-# Semantic Search Engine (Lab 3)
+# Semantic Search Engine
 
 A small semantic search system: it turns a corpus of short text documents into
 embeddings, searches them by meaning (not just keyword overlap) using cosine
@@ -100,8 +100,8 @@ the two modes produce embeddings of different dimensionality).
 
 ## Notes
 
-- Cosine similarity and the PCA-via-SVD approach are the same techniques
-  used in Lab 2, reused here for retrieval and visualization respectively.
+- Cosine similarity and the PCA-via-SVD projection are the two core linear
+  algebra techniques underlying retrieval and visualization here.
 - In offline mode, cluster separation in the PCA plot is expected to be
   looser than in API mode, since the hashed bag-of-words vectors only
   capture shared vocabulary, not underlying meaning.
