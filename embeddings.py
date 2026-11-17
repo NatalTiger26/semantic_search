@@ -1,103 +1,184 @@
-"""Embedding fetching for your semantic search system.
+"""Embedding generation module for semantic search.
 
-Two modes, controlled by the LAB3_EMBEDDING_MODE environment variable:
+Supports two operational modes:
+    1. "offline" (default): A deterministic hashed bag-of-words representation
+       requiring no external API keys or network connection. Ideal for local
+       development, integration testing, and CI environments.
+    2. "api": Integrates with the NVIDIA NIM embeddings microservice
+       (model: nvidia/nv-embedqa-e5-v5) for high-dimensional semantic embeddings.
 
-    "offline" (default) - a hashed bag-of-words vector. Fully implemented
-                below already - you don't need to write or even fully
-                understand this part, it's provided so you can build and
-                test your whole pipeline with no API key and no network.
-    "api"     - calls NVIDIA NIM's embeddings endpoint. THIS is the part
-                you implement - see get_embedding() below.
-
-Both modes return a plain Python list of floats, so the rest of your code
-never needs to know which one is in use.
+Both modes return a flat Python list of floats, providing a uniform interface
+for downstream similarity calculations and matrix operations.
 """
+
+from __future__ import annotations
 
 import hashlib
 import math
 import os
 import re
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()  # picks up NVIDIA_API_KEY and LAB3_EMBEDDING_MODE from a .env file, if present
+# Load configuration from .env file if available
+load_dotenv()
 
-EMBEDDING_MODE = os.environ.get("LAB3_EMBEDDING_MODE", "offline")  # "api" or "offline"
-API_KEY = os.environ.get("NVIDIA_API_KEY")
-EMBEDDING_MODEL = "nvidia/nv-embedqa-e5-v5"
-EMBEDDING_URL = "https://integrate.api.nvidia.com/v1/embeddings"
+# Configuration and constants
+DEFAULT_EMBEDDING_MODEL: str = "nvidia/nv-embedqa-e5-v5"
+EMBEDDING_MODEL: str = DEFAULT_EMBEDDING_MODEL
+EMBEDDING_URL: str = "https://integrate.api.nvidia.com/v1/embeddings"
+OFFLINE_DIM: int = 64
 
-OFFLINE_DIM = 64
-_WORD_RE = re.compile(r"[a-z']+")
+EMBEDDING_MODE: str = os.environ.get("LAB3_EMBEDDING_MODE", "offline")
+API_KEY: str | None = os.environ.get("NVIDIA_API_KEY")
+
+_WORD_RE: re.Pattern[str] = re.compile(r"[a-z']+")
+
+__all__ = [
+    "API_KEY",
+    "DEFAULT_EMBEDDING_MODEL",
+    "EMBEDDING_MODE",
+    "EMBEDDING_MODEL",
+    "EMBEDDING_URL",
+    "OFFLINE_DIM",
+    "_get_embedding_api",
+    "_get_embedding_offline",
+    "get_embedding",
+]
 
 
-# --- Provided for you: don't need to modify this ---------------------------
-def _get_embedding_offline(text, dim=OFFLINE_DIM):
-    """A deterministic hashed bag-of-words vector - no model, no network.
+def _get_embedding_offline(text: str, dim: int = OFFLINE_DIM) -> list[float]:
+    """Compute a deterministic hashed bag-of-words vector locally.
 
-    Each word hashes into one of `dim` buckets and increments a count there.
-    The result is L2-normalized so cosine similarity behaves sensibly.
-    Documents that share vocabulary land close together, which is enough to
-    test the full search + visualization pipeline offline. This is a real,
-    historically-used text representation technique (not a random stub) -
-    it just isn't a semantic embedding, so don't expect meaning-based
-    matches from it. Swap to API mode for that.
+    Each word in the lower-cased input is mapped to a bucket in [0, dim) via MD5
+    hash modulo, accumulating token frequencies. The resultant vector is
+    L2-normalized to ensure unit length, allowing cosine similarity to behave
+    consistently.
+
+    Args:
+        text: Input string to embed.
+        dim: Dimensionality of the output embedding vector. Defaults to OFFLINE_DIM (64).
+
+    Returns:
+        A list of floats of length `dim`, representing the L2-normalized vector.
+        Returns a zero-vector if no words are found.
     """
+    vec: list[float] = [0.0] * dim
+    words: list[str] = _WORD_RE.findall(text.lower())
 
-    vec = [0.0] * dim
-    words = _WORD_RE.findall(text.lower())
     for word in words:
-        bucket = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16) % dim
+        bucket: int = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16) % dim
         vec[bucket] += 1.0
-    norm = math.sqrt(sum(v * v for v in vec))
-    if norm > 0:
+
+    norm: float = math.sqrt(sum(v * v for v in vec))
+    if norm > 0.0:
         vec = [v / norm for v in vec]
+
     return vec
-# -----------------------------------------------------------------------
 
 
-def _get_embedding_api(text, input_type="passage"):
-    """TODO: implement this.
+def _get_embedding_api(
+    text: str,
+    input_type: str = "passage",
+    api_key: str | None = None,
+    timeout: float = 30.0,
+) -> list[float]:
+    """Fetch semantic embeddings from the NVIDIA NIM API.
 
-    Call NVIDIA NIM's embeddings endpoint (same pattern as Lab 1's chat
-    completions call - check for a key, POST with the right headers/body,
-    handle the response) and return the embedding as a plain list of floats.
+    Calls the NVIDIA NIM embeddings endpoint (`nvidia/nv-embedqa-e5-v5`).
+    Requires an active NVIDIA API key and network connectivity.
 
-    Two things that are DIFFERENT from Lab 1's chat endpoint - read the
-    NIM API docs / Lab3_Instructions.md before assuming the shape:
-      - `input` in the request body must be a LIST of strings, not a bare string.
-      - this model needs an `input_type` field: "passage" for documents you're
-        indexing, "query" for the search query itself.
+    Args:
+        text: Input text string to embed.
+        input_type: Model input type. Must be either "passage" (for document
+            indexing) or "query" (for search queries). Defaults to "passage".
+        api_key: Optional explicit API key. If omitted, falls back to the
+            NVIDIA_API_KEY environment variable.
+        timeout: Network request timeout in seconds. Defaults to 30.0.
+
+    Returns:
+        Dense float embedding vector returned by the model.
+
+    Raises:
+        ValueError: If NVIDIA_API_KEY is unset or empty, or if `input_type`
+            is invalid.
+        requests.RequestException: If the network request fails or returns an
+            HTTP error status.
     """
+    resolved_key: str | None = api_key or os.environ.get("NVIDIA_API_KEY") or API_KEY
+    if not resolved_key or not resolved_key.strip():
+        raise ValueError(
+            "NVIDIA_API_KEY not found. Please set the NVIDIA_API_KEY environment "
+            "variable or supply it in a .env file."
+        )
 
-    if API_KEY is None:
-        raise ValueError("NVIDIA_API_KEY not found.")
+    if input_type not in ("passage", "query"):
+        raise ValueError(
+            f"Invalid input_type: {input_type!r}. Must be 'passage' or 'query'."
+        )
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
+    headers: dict[str, str] = {
+        "Authorization": f"Bearer {resolved_key.strip()}",
+        "Content-Type": "application/json",
     }
 
-    payload = {
+    payload: dict[str, Any] = {
         "model": EMBEDDING_MODEL,
-        "input": [text],          # IMPORTANT: list of strings
-        "input_type": input_type  # "passage" or "query"
+        "input": [text],
+        "input_type": input_type,
     }
 
-    response = requests.post(
+    response: requests.Response = requests.post(
         EMBEDDING_URL,
         headers=headers,
-        json=payload
+        json=payload,
+        timeout=timeout,
     )
-
     response.raise_for_status()
-    data = response.json()
 
-    return data["data"][0]["embedding"]
+    data: dict[str, Any] = response.json()
+    try:
+        embedding: list[float] = data["data"][0]["embedding"]
+        return embedding
+    except (KeyError, IndexError, TypeError) as err:
+        raise ValueError(
+            f"Malformed response received from NVIDIA NIM embeddings endpoint: {data}"
+        ) from err
 
 
-def get_embedding(text, input_type="passage"):
-    if EMBEDDING_MODE == "api":
+def get_embedding(
+    text: str,
+    input_type: str = "passage",
+    mode: str | None = None,
+) -> list[float]:
+    """Retrieve text embedding using either offline or API mode.
+
+    The active mode is resolved from the `mode` argument, the `LAB3_EMBEDDING_MODE`
+    environment variable, or the module default (defaults to "offline").
+
+    Args:
+        text: Text to be embedded.
+        input_type: Role of text; "passage" for indexed documents or "query" for
+            search queries. Defaults to "passage".
+        mode: Optional override for embedding mode ("offline" or "api").
+
+    Returns:
+        List of floats containing the embedding representation.
+
+    Raises:
+        ValueError: If an unknown mode is provided or API key is missing in API mode.
+    """
+    resolved_mode: str = (
+        mode or os.environ.get("LAB3_EMBEDDING_MODE") or EMBEDDING_MODE
+    ).lower().strip()
+
+    if resolved_mode == "api":
         return _get_embedding_api(text, input_type=input_type)
-    return _get_embedding_offline(text)
+    if resolved_mode == "offline":
+        return _get_embedding_offline(text)
+
+    raise ValueError(
+        f"Unknown embedding mode: {resolved_mode!r}. Expected 'offline' or 'api'."
+    )
