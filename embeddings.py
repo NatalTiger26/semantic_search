@@ -115,9 +115,7 @@ def _get_embedding_api(
         )
 
     if input_type not in ("passage", "query"):
-        raise ValueError(
-            f"Invalid input_type: {input_type!r}. Must be 'passage' or 'query'."
-        )
+        raise ValueError(f"Invalid input_type: {input_type!r}. Must be 'passage' or 'query'.")
 
     headers: dict[str, str] = {
         "Authorization": f"Bearer {resolved_key.strip()}",
@@ -171,14 +169,12 @@ def get_embedding(
         ValueError: If an unknown mode is provided or API key is missing in API mode.
     """
     resolved_mode: str = (
-        mode or os.environ.get("LAB3_EMBEDDING_MODE") or EMBEDDING_MODE
-    ).lower().strip()
+        (mode or os.environ.get("LAB3_EMBEDDING_MODE") or EMBEDDING_MODE).lower().strip()
+    )
 
     if resolved_mode == "api":
         return _get_embedding_api(text, input_type=input_type)
     if resolved_mode == "offline":
         return _get_embedding_offline(text)
 
-    raise ValueError(
-        f"Unknown embedding mode: {resolved_mode!r}. Expected 'offline' or 'api'."
-    )
+    raise ValueError(f"Unknown embedding mode: {resolved_mode!r}. Expected 'offline' or 'api'.")

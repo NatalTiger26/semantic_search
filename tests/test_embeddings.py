@@ -61,8 +61,9 @@ def test_offline_embedding_empty_string() -> None:
 
 def test_api_embedding_missing_key() -> None:
     """Verify _get_embedding_api raises ValueError when API key is missing."""
-    with patch.dict(os.environ, {}, clear=True), pytest.raises(
-        ValueError, match="NVIDIA_API_KEY not found"
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        pytest.raises(ValueError, match="NVIDIA_API_KEY not found"),
     ):
         _get_embedding_api("test query", api_key=None)
 
@@ -111,8 +112,9 @@ def test_api_embedding_malformed_response() -> None:
     mock_response.status_code = 200
     mock_response.json.return_value = {"status": "ok"}  # missing "data"
 
-    with patch("requests.post", return_value=mock_response), pytest.raises(
-        ValueError, match="Malformed response"
+    with (
+        patch("requests.post", return_value=mock_response),
+        pytest.raises(ValueError, match="Malformed response"),
     ):
         _get_embedding_api("test", api_key="test_key")
 

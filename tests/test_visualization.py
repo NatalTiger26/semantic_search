@@ -64,8 +64,7 @@ def test_plot_embedding_space_file_output(tmp_path: Path) -> None:
     np.random.seed(42)
     matrix: np.ndarray = np.random.randn(10, 8)
     docs: list[dict[str, Any]] = [
-        {"id": i, "topic": "Physics" if i < 5 else "Biology", "text": f"Doc {i}"}
-        for i in range(10)
+        {"id": i, "topic": "Physics" if i < 5 else "Biology", "text": f"Doc {i}"} for i in range(10)
     ]
     output_img: Path = tmp_path / "test_pca.png"
 

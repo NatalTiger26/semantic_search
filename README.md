@@ -100,20 +100,27 @@ The corpus (`documents.json`) contains **81 distinct documents** across **5 non-
 
 ### Search Verification Benchmarks
 
-| Query | Top-1 Matched Document | Topic | Offline Score | API Mode Score |
+The benchmark results below reflect queries executed against the 81-document corpus in both operational modes:
+
+| Query | Top-1 Matched Document Passage | Topic | Offline Score | API Mode Score |
 |---|---|:---:|:---:|:---:|
-| `"quantum mechanics"` | *"Quantum mechanics describes the physical properties of nature at the scale of atoms and subatomic particles."* | **Physics** | 0.4400 | 0.8642 |
-| `"deep learning"` | *"Deep learning utilizes multilayer artificial neural networks to model complex representations from raw data."* | **Computer Science** | 0.3812 | 0.8415 |
-| `"sourdough bread baking"` | *"Sourdough bread relies on wild yeast and lactic acid bacteria for slow fermentation and complex flavor development."* | **Cooking** | 0.4128 | 0.8750 |
-| `"CRISPR gene editing"` | *"CRISPR-Cas9 acts as molecular scissors allowing precise targeted alterations to genomic DNA sequences."* | **Biology** | 0.3955 | 0.8821 |
+| `"quantum mechanics"` | *"Quantum mechanics is the branch of physics that describes the behavior of matter and energy at the smallest scales, such as atoms and subatomic particles..."* | **Physics** | 0.4399 | 0.4616 |
+| `"deep learning"` | *"Artificial intelligence is a multidisciplinary field that aims to create systems capable of performing tasks that typically require human intelligence..."* | **Computer Science** | 0.2571 | 0.4055 |
+| `"baking bread with yeast"` | *"Bread rises primarily because yeast, a living microorganism, consumes sugars in the dough and produces carbon dioxide gas and ethanol through fermentation..."* | **Cooking** | 0.4714 | 0.4892 |
+| `"DNA replication"` | *"DNA, or deoxyribonucleic acid, is the hereditary material that contains the genetic instructions for the development and function of all living organisms..."* | **Biology** | 0.3873 | 0.4421 |
+
+> [!NOTE]
+> In offline mode, the deterministic hashed bag-of-words representation ranks documents by shared token vocabulary (e.g. `"quantum mechanics"` cleanly hits the physics passage). For abstract queries without exact word matches (such as `"deep learning"`), API mode semantic embeddings correctly surface conceptually aligned documents (Artificial Intelligence / Machine Learning).
 
 ### PCA Explained Variance Ratios
 
+Computed on the 81-document corpus via compact SVD:
+
 | Principal Component | Offline Mode (64-d) | API Mode (1024-d) |
 |---|:---:|:---:|
-| **PC 1** | ~11.76% | ~18.42% |
-| **PC 2** | ~8.09% | ~12.95% |
-| **Cumulative (2D)** | **~19.85%** | **~31.37%** |
+| **PC 1** | ~11.76% | ~8.37% |
+| **PC 2** | ~8.09% | ~7.57% |
+| **Cumulative (2D)** | **~19.85%** | **~15.94%** |
 
 *Note: In offline mode, documents cluster primarily by literal word collisions. In API mode, semantic affinities form tightly grouped clusters with distinct geometric separation.*
 
@@ -198,7 +205,9 @@ results = search(
 )
 
 for rank, res in enumerate(results, start=1):
-    print(f"#{rank} [Score: {res['score']:.4f}] ({res['document']['topic']}): {res['document']['text']}")
+    print(
+        f"#{rank} [Score: {res['score']:.4f}] ({res['document']['topic']}): {res['document']['text']}"
+    )
 
 # 4. Generate 2D PCA visualization
 plot_embedding_space(

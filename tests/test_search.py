@@ -72,12 +72,14 @@ def test_cosine_similarity_edge_cases() -> None:
 def test_cosine_similarity_vectorized() -> None:
     """Verify 1D vs 2D cosine similarity behaves identically to pairwise calculations."""
     query: np.ndarray = np.array([1.0, 0.0, 0.0])
-    matrix: np.ndarray = np.array([
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [-1.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0],
-    ])
+    matrix: np.ndarray = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [-1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ]
+    )
 
     sims: np.ndarray = cosine_similarity(query, matrix)  # type: ignore[assignment]
     assert isinstance(sims, np.ndarray)

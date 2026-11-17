@@ -23,6 +23,7 @@ import numpy as np
 from embeddings import OFFLINE_DIM, get_embedding
 
 CACHE_FILE: Path = Path("embeddings_cache.json")
+OFFLINE_CACHE_FILE: Path = Path("embeddings_cache_offline.json")
 logger: logging.Logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -169,11 +170,33 @@ def build_embedding_matrix(
     if not documents:
         return np.empty((0, 0), dtype=np.float32)
 
-    cache_path: Path | None = Path(cache_file) if cache_file is not None else None
-
-    # Determine expected dimension based on active mode
+    cache_path: Path | None = None
     active_mode: str = os.environ.get("LAB3_EMBEDDING_MODE", "offline").lower().strip()
     expected_dim: int = OFFLINE_DIM if active_mode == "offline" else 1024
+
+    if cache_file is not None:
+        target_path: Path = Path(cache_file)
+        if target_path == CACHE_FILE and active_mode == "offline":
+            # Protect pre-computed high-dimensional API embeddings from being overwritten
+            # when running in offline fallback mode
+            if target_path.exists():
+                try:
+                    with open(target_path, encoding="utf-8") as f:
+                        probe_data: Any = json.load(f)
+                    if (
+                        isinstance(probe_data, list)
+                        and probe_data
+                        and len(probe_data[0]) != OFFLINE_DIM
+                    ):
+                        cache_path = OFFLINE_CACHE_FILE
+                    else:
+                        cache_path = target_path
+                except Exception:
+                    cache_path = OFFLINE_CACHE_FILE
+            else:
+                cache_path = target_path
+        else:
+            cache_path = target_path
 
     if cache_path is not None and cache_path.exists() and not force_refresh:
         try:
